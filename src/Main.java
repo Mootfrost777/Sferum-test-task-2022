@@ -72,7 +72,7 @@ public class Main {
                 case "exit" -> {
                     System.exit(0);
                 }
-                default -> System.out.println("Invalid command");
+                default -> System.out.println("I don't understand.");
             }
         }
     }
@@ -120,7 +120,7 @@ public class Main {
                     conn.Close();
                     System.exit(0);
                 }
-                default -> System.out.println("Invalid command.");
+                default -> System.out.println("I don't understand.");
             }
         }
     }
