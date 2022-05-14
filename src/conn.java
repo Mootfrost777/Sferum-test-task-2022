@@ -94,10 +94,11 @@ public class conn {
         statement.setString(1, user.username);
         statement.setMaxRows(1);
         if (!statement.executeQuery().next()) {
-            statement = conn.prepareStatement("insert into users (username, balance, password) values (?, ?, ?)");
+            statement = conn.prepareStatement("insert into users (username, balance, password, boughtBooks) values (?, ?, ?, ?)");
             statement.setString(1, user.username);
             statement.setDouble(2, user.balance);
             statement.setString(3, user.password);
+            statement.setString(4, new Gson().toJson(user.boughtBooks));
             statement.executeUpdate();
 
             statement = conn.prepareStatement("select id from users where username = ?");

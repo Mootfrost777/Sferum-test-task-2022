@@ -26,6 +26,7 @@ public class Main {
                        register <username> <password> <repeat password> <balance> - register new user
                        login <username> <password> - login
                        add_books - add books to stock
+                       exit - exit
                         """);
 
         loop: while (true) {
