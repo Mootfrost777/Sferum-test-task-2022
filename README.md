@@ -1,6 +1,6 @@
 # Sferum-test-task-2022
 Тестовое задание для направления бэкэнд для Сферум 2022. <br/>
-Техзадание: https://like-brace-188.notion.site/dc79d7bc33cc477bb3e7ba6e40c62f3f
+Техзадание: https://like-brace-188.notion.site/dc79d7bc33cc477bb3e7ba6e40c62f3f <br/>
 Зеркало: https://disk.yandex.ru/d/n20PI-RSyGU0HA
 
 # Features
