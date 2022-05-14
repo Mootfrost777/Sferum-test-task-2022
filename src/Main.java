@@ -4,6 +4,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 
 import java.sql.SQLException;
 
+import java.util.ArrayList;
 import java.util.Scanner;
 import java.lang.*;
 
@@ -14,15 +15,16 @@ public class Main {
         conn.Conn();  // Initialize database.
         conn.CreateDB();
 
-        Auth();  // Authenticate user. Optional.
-        MainLoop();  // Main app loop.
+        Auth();  // Authenticate user.
+        MainLoop(); // Main loop.
     }
 
     private static void Auth() throws SQLException {
         System.out.println("""
                        Commands:
-                       register <username> <password> <balance> - register new user
+                       register <username> <password> <repeat password> <balance> - register new user
                        login <username> <password> - login
+                       add_books - add books to stock
                         """);
 
         loop: while (true) {
@@ -32,8 +34,12 @@ public class Main {
 
             switch (Args[0]) {
                 case "register" -> {
-                    if (Args.length != 4) {
+                    if (Args.length != 5) {
                         System.out.println("Wrong number of arguments.");
+                        break;
+                    }
+                    if (!Args[2].equals(Args[3])) {
+                        System.out.println("Passwords do not match.");
                         break;
                     }
 
@@ -60,6 +66,9 @@ public class Main {
                         System.out.println("User not found.");
                     }
                 }
+                case "add_books" -> {
+                    AddBooks();
+                }
                 case "exit" -> {
                     System.exit(0);
                 }
@@ -67,9 +76,8 @@ public class Main {
             }
         }
     }
-
     private static void MainLoop() throws SQLException {
-        Help();
+        System.out.println(Help());
 
         while (true) {
             String command = sc.nextLine();
@@ -80,73 +88,33 @@ public class Main {
 
             switch (Args[0]) {
                 case "print_balance" -> {
-                    System.out.println("Your balance: " + user.balance);
+                    System.out.println("Your balance: " + user.balance + " rub.");
                 }
                 case "show_books_in_stock" -> {
-                    for (Book book : conn.GetAllBooks()) {
-                        System.out.println("\"" + book.title + "\", " + book.quantity + " pieces, " + book.price + " rub.");
+                    for (String book : GetInStock()) {
+                        System.out.println(book);
                     }
                 }
                 case "buy" -> {
                     if (Args.length != 3) {
                         System.out.println("no deal");
-                        break;
                     }
-
-                    Book RequestedBook = conn.GetBook(Args[1]);
-
-                    if (RequestedBook == null ||
-                            RequestedBook.quantity < Integer.parseInt(Args[2]) ||
-                            user.balance < RequestedBook.price * Integer.parseInt(Args[2])) {
-                        System.out.println("no deal");
-                    }
-                    else {
-                        user.balance -= RequestedBook.price * Integer.parseInt(Args[2]);
-                        RequestedBook.quantity -= Integer.parseInt(Args[2]);
-                        user.boughtBooks.add(RequestedBook);
-
-                        conn.UpdateUser(user);
-                        conn.UpdateBook(RequestedBook);
-
-                        System.out.println("deal");
-                    }
+                    System.out.println(BuyBook(Args[1], Integer.parseInt(Args[2])));
                 }
                 case "show_bought_books" -> {
-                    for (Book book : conn.GetUser(user.id).boughtBooks) {
-                        System.out.println("\"" + book.title + "\", " + book.quantity + " pieces.");
-                    }
-                }
-                case "add_books" -> {
-                    String book;
-                    System.out.println("Enter books \"<name>\", <quantity>, <price>: ");
-
-                    while (true){
-                        book = sc.nextLine();
-
-                        if (book.equals("0")) {
-                            break;
-                        }
-
-                        String[] bookInfo = book.split(", ");
-
-                        bookInfo[0] = bookInfo[0].replace("\"", "");
-                        try {
-                            conn.AddBook(new Book(bookInfo[0], Integer.parseInt(bookInfo[1]), Integer.parseInt(bookInfo[2])));
-                        } catch (NumberFormatException e) {
-                            System.out.println("Invalid book info.");
-                        }
+                    for (String book : GetBoughtBooks()) {
+                        System.out.println(book);
                     }
                 }
                 case "top_up" -> {
-                    try {
-                        user.balance += Integer.parseInt(Args[1]);
-                        conn.UpdateUser(user);
-                    } catch (Exception e) {
-                        System.out.println("Invalid amount.");
-                    }
+                    System.out.println(TopUp(Integer.parseInt(Args[1])));
                 }
                 case "help" -> {
-                    Help();
+                    System.out.println(Help());
+                }
+                case "logout" -> {
+                    Auth();
+                    System.out.println(Help());
                 }
                 case "exit" -> {
                     conn.Close();
@@ -156,18 +124,90 @@ public class Main {
             }
         }
     }
+    private static void AddBooks() throws SQLException {
+        String book;
+        System.out.println("Enter books \"<name>\", <price>, <quantity>: ");
 
-    private static void Help() {
-        System.out.println("""
+        while (true){
+            book = sc.nextLine();
+
+            if (book.equals("0")) {
+                break;
+            }
+
+            String[] bookInfo = book.split(", ");
+
+            bookInfo[0] = bookInfo[0].replace("\"", "");
+            try {
+                conn.AddBook(new Book(bookInfo[0], Integer.parseInt(bookInfo[1]), Integer.parseInt(bookInfo[2])));
+            } catch (Exception e) {
+                System.out.println("Invalid book info.");
+            }
+        }
+    }
+    private static String BuyBook(String title, int quantity) throws SQLException {
+        Book RequestedBook = conn.GetBook(title);
+
+        if (RequestedBook == null ||
+                RequestedBook.quantity < quantity ||
+                user.balance < RequestedBook.price * quantity) {
+            return "no deal";
+        }
+        else {
+            user.balance -= RequestedBook.price * quantity;
+            RequestedBook.quantity -= quantity;
+
+            boolean IsAlreadyBought = false;
+            for (Book book : user.boughtBooks) {
+                if (book.title.equals(RequestedBook.title)) {
+                    book.quantity += quantity;
+                    IsAlreadyBought = true;
+                }
+            }
+            if (!IsAlreadyBought) {
+                user.boughtBooks.add(new Book(RequestedBook.title, RequestedBook.price, quantity));
+            }
+
+            conn.UpdateUser(user);
+            conn.UpdateBook(RequestedBook);
+
+            return "deal";
+        }
+    }
+    private static ArrayList<String> GetInStock() throws SQLException {
+        ArrayList<String> Books = new ArrayList<>();
+        for (Book book : conn.GetAllBooks()) {
+            Books.add("\"" + book.title + "\", " + book.quantity + " pieces, " + book.price + " rub.");
+        }
+        return Books;
+    }
+    private static ArrayList<String> GetBoughtBooks() throws SQLException {
+        ArrayList<String> Books = new ArrayList<>();
+        for (Book book : conn.GetUser(user.id).boughtBooks) {
+            Books.add("\"" + book.title + "\", " + book.quantity + " pieces.");
+        }
+        return Books;
+    }
+    private static String TopUp(int sum) throws SQLException {
+        try {
+            user.balance += sum;
+            conn.UpdateUser(user);
+            return "Your balance is " + user.balance + " rub.";
+        } catch (Exception e) {
+            return "Invalid amount.";
+        }
+    }
+    private static String Help() {
+        return """
                 Commands:
                 print_balance - print your balance
                 show_books_in_stock - show books in stock
                 buy "<name>" <quantity> - buy book
                 show_bought_books - show bought books
                 top_up <amount> - top up your balance
-                add_books - add books to stock
                 help - show commands list
+                logout - logout
                 exit - exit
-                """);
+                """;
     }
 }

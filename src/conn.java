@@ -8,8 +8,6 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import java.io.Serializable;
-
 public class conn {
     public static Connection conn;
     public static Statement stmt;
@@ -42,11 +40,17 @@ public class conn {
 
     public static void AddBook(Book book) throws SQLException { // Add book to the database.
         stmt = conn.createStatement();
-        PreparedStatement statement = conn.prepareStatement("insert into books (title, price, quantity) values (?, ?, ?)");
-        statement.setString(1, book.title);
-        statement.setDouble(2, book.price);
-        statement.setInt(3, book.quantity);
-        statement.executeUpdate();
+        Book b = GetBook(book.title);
+        if (b != null) {
+            UpdateBook(new Book(book.id, book.title, book.price, book.quantity + b.quantity));
+        }
+        else {
+            PreparedStatement statement = conn.prepareStatement("insert into books (title, price, quantity) values (?, ?, ?)");
+            statement.setString(1, book.title);
+            statement.setDouble(2, book.price);
+            statement.setInt(3, book.quantity);
+            statement.executeUpdate();
+        }
     }
 
     public static Book GetBook(String title) throws SQLException { // Get book by id.
