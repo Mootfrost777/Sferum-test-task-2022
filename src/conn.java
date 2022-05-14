@@ -116,7 +116,8 @@ public class conn {
 
         ResultSet rs = statement.executeQuery();
         if (rs.next()) {
-            return new User(rs.getInt("id"), rs.getString("username"), rs.getDouble("balance"));
+            Type listType = new TypeToken<List<Book>>() {}.getType();
+            return new User(rs.getInt("id"), rs.getString("username"), rs.getDouble("balance"), new Gson().fromJson(rs.getString("boughtBooks"), listType));
         }
         else {
             return null;
