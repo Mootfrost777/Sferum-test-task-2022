@@ -2,6 +2,7 @@
 
 import org.apache.commons.codec.digest.DigestUtils;
 
+import java.security.spec.ECField;
 import java.sql.SQLException;
 
 import java.util.ArrayList;
@@ -88,7 +89,7 @@ public class Main {
 
             switch (Args[0]) {
                 case "print_balance" -> {
-                    System.out.println("Your balance: " + user.balance + " rub.");
+                    System.out.println("balance: " + user.balance + " rub.");
                 }
                 case "show_books_in_stock" -> {
                     for (String book : GetInStock()) {
@@ -96,10 +97,16 @@ public class Main {
                     }
                 }
                 case "buy" -> {
+                    Args = command.split("\"");
                     if (Args.length != 3) {
                         System.out.println("no deal");
                     }
-                    System.out.println(BuyBook(Args[1], Integer.parseInt(Args[2])));
+                    try {
+                        System.out.println(BuyBook(Args[1], Integer.parseInt(Args[2].trim())));
+                    }
+                    catch (Exception e) {
+                        System.out.println("no deal");
+                    }
                 }
                 case "show_bought_books" -> {
                     for (String book : GetBoughtBooks()) {
@@ -126,12 +133,13 @@ public class Main {
     }
     private static void AddBooks() throws SQLException {
         String book;
-        System.out.println("Enter books \"<name>\", <price>, <quantity>: ");
+        System.out.println("Enter books (\"<name>\", <price>, <quantity>), press Enter if want to end: ");
 
         while (true){
             book = sc.nextLine();
 
-            if (book.equals("0")) {
+            if (book.equals("")) {
+                System.out.println("All books added.");
                 break;
             }
 
