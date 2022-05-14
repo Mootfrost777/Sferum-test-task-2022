@@ -3,6 +3,7 @@
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,7 @@ public class conn {
                 id integer primary key,
                 title varchar,
                 price real,
-                available integer)
+                quantity integer)
                 """);
 
         stmt.execute("""
@@ -41,22 +42,24 @@ public class conn {
 
     public static void AddBook(Book book) throws SQLException { // Add book to the database.
         stmt = conn.createStatement();
-        PreparedStatement statement = conn.prepareStatement("insert into books (title, price, available) values (?, ?, ?)");
+        PreparedStatement statement = conn.prepareStatement("insert into books (title, price, quantity) values (?, ?, ?)");
         statement.setString(1, book.title);
         statement.setDouble(2, book.price);
-        statement.setInt(3, book.availableQuantity);
+        statement.setInt(3, book.quantity);
         statement.executeUpdate();
     }
 
-    public static Book GetBook(int id) throws SQLException { // Get book by id.
+    public static Book GetBook(String title) throws SQLException { // Get book by id.
         stmt = conn.createStatement();
-        PreparedStatement statement = conn.prepareStatement("select * from books where id = ?");
-        statement.setInt(1, id);
+        PreparedStatement statement = conn.prepareStatement("select * from books where title = ?");
+        statement.setString(1, title);
         statement.setMaxRows(1);
 
         ResultSet rs = statement.executeQuery();
-
-        return new Book(rs.getInt("id"), rs.getString("title"), rs.getDouble("price"), rs.getInt("available"));
+        if (rs.next()) {
+            return new Book(rs.getInt("id"), rs.getString("title"), rs.getDouble("price"), rs.getInt("quantity"));
+        }
+        return null;
     }
 
     public static List<Book> GetAllBooks() throws SQLException { // Get all books.
@@ -66,7 +69,7 @@ public class conn {
         List<Book> books = new ArrayList<Book>();
         while (rs.next())
         {
-            books.add(new Book(rs.getInt("id"), rs.getString("title"), rs.getDouble("price"), rs.getInt("available")));
+            books.add(new Book(rs.getInt("id"), rs.getString("title"), rs.getDouble("price"), rs.getInt("quantity")));
         }
 
         return books;
@@ -74,20 +77,20 @@ public class conn {
 
     public static void UpdateBook(Book book) throws SQLException { // Update book.
         stmt = conn.createStatement();
-        PreparedStatement statement = conn.prepareStatement("update books set price = ?, available = ? where book.id = ?");
+        PreparedStatement statement = conn.prepareStatement("update books set price = ?, quantity = ? where title = ?");
         statement.setDouble(1, book.price);  // Java is SUS, it doesn't consume arguments in execute.,=
-        statement.setInt(2, book.availableQuantity);
+        statement.setInt(2, book.quantity);
         statement.setString(3, book.title);
         statement.executeUpdate();
     }
 
     public static int Register(User user) throws SQLException { // Register user.
         stmt = conn.createStatement();
-        PreparedStatement statement = conn.prepareStatement("search users where username = ?");
+        PreparedStatement statement = conn.prepareStatement("select * from users where username = ?");
         statement.setString(1, user.username);
         statement.setMaxRows(1);
         if (!statement.executeQuery().next()) {
-            statement = conn.prepareStatement("insert into users (name, balance, password) values (?, ?, ?)");
+            statement = conn.prepareStatement("insert into users (username, balance, password) values (?, ?, ?)");
             statement.setString(1, user.username);
             statement.setDouble(2, user.balance);
             statement.setString(3, user.password);
@@ -102,14 +105,14 @@ public class conn {
 
     public static User Login(String username, String password) throws SQLException { // Login user.
         stmt = conn.createStatement();
-        PreparedStatement statement = conn.prepareStatement("select * from users where name = ? and password = ?");
+        PreparedStatement statement = conn.prepareStatement("select * from users where username = ? and password = ?");
         statement.setString(1, username);
         statement.setString(2, password);
         statement.setMaxRows(1);
 
         ResultSet rs = statement.executeQuery();
         if (rs.next()) {
-            return new User(rs.getInt("id"), rs.getString("name"), rs.getDouble("balance"));
+            return new User(rs.getInt("id"), rs.getString("username"), rs.getDouble("balance"));
         }
         else {
             return null;
@@ -118,7 +121,7 @@ public class conn {
 
     public static void UpdateUser(User user) throws SQLException { // Update user.
         stmt = conn.createStatement();
-        PreparedStatement statement = conn.prepareStatement("update users set balance = ?, boughtBooks = ? where users.id = ?");
+        PreparedStatement statement = conn.prepareStatement("update users set balance = ?, boughtBooks = ? where username = ?");
         statement.setDouble(1, user.balance);
         statement.setString(2, new Gson().toJson(user.boughtBooks));
         statement.setString(3, user.username);
@@ -132,7 +135,11 @@ public class conn {
         statement.setMaxRows(1);
 
         ResultSet rs = statement.executeQuery();
+        Type listType = new TypeToken<List<Book>>() {}.getType();
+        return new User(rs.getInt("id"), rs.getString("username"), rs.getDouble("balance"), new Gson().fromJson(rs.getString("boughtBooks"), listType));
+    }
 
-        return new User(rs.getInt("id"), rs.getString("name"), rs.getDouble("balance"), new Gson().fromJson(rs.getString("boughtBooks"), ArrayList.class));
+    public static void Close() throws SQLException { // Close connection.
+        conn.close();
     }
 }

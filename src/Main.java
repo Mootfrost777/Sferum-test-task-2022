@@ -3,42 +3,41 @@
 import org.apache.commons.codec.digest.DigestUtils;
 
 import java.sql.SQLException;
-import java.util.List;
-import java.util.Objects;
+
 import java.util.Scanner;
-import java.lang.System;
+import java.lang.*;
 
 public class Main {
-
+    private static User user;  // User object. Can be instantiated without Register method.
+    private final static Scanner sc = new Scanner(System.in);
     public static void main(String[] args) throws ClassNotFoundException, SQLException {
         conn.Conn();  // Initialize database.
         conn.CreateDB();
 
-        Scanner sc = new Scanner(System.in);
+        Auth();  // Authenticate user. Optional.
+        MainLoop();  // Main app loop.
+    }
 
-        User user;
-
+    private static void Auth() throws SQLException {
         System.out.println("""
                        Commands:
-                       register - register new user
-                       login - login
+                       register <username> <password> <balance> - register new user
+                       login <username> <password> - login
                         """);
 
         loop: while (true) {
             String command = sc.nextLine();
 
-            switch (command) {
+            String[] Args = command.split(" ");
+
+            switch (Args[0]) {
                 case "register" -> {
-                    System.out.println("Enter your name: ");
-                    String name = sc.nextLine();
+                    if (Args.length != 4) {
+                        System.out.println("Wrong number of arguments.");
+                        break;
+                    }
 
-                    System.out.println("Enter your password: ");
-                    String password = DigestUtils.sha256Hex(sc.nextLine()); // Hash password.
-
-                    System.out.println("Enter your balance: ");
-                    double balance = sc.nextDouble();
-
-                    user = new User(name, password, balance);
+                    user = new User(Args[1], DigestUtils.sha256Hex(Args[2]), Integer.parseInt(Args[3]));
                     int id = conn.Register(user);
                     if (id != -1) {
                         System.out.println("User registered successfully.");
@@ -51,13 +50,7 @@ public class Main {
                     }
                 }
                 case "login" -> {
-                    System.out.println("Enter your name: ");
-                    String name = sc.nextLine();
-
-                    System.out.println("Enter your password: ");
-                    String password = DigestUtils.sha256Hex(sc.nextLine()); // Hash password.
-
-                    user = conn.Login(name, password);
+                    user = conn.Login(Args[1], DigestUtils.sha256Hex(Args[2]));
                     if (user != null) {
                         System.out.println("User logged in successfully.");
 
@@ -73,54 +66,108 @@ public class Main {
                 default -> System.out.println("Invalid command");
             }
         }
+    }
+
+    private static void MainLoop() throws SQLException {
+        Help();
 
         while (true) {
-            System.out.println("""
-                Commands:
-                print balance - print your balance
-                show books in stock - show books in stock
-                buy - buy book
-                show bought books - show bought books
-                add books - add books to stock
-                exit - exit
-                """);
-
             String command = sc.nextLine();
+            String[] Args = command.toLowerCase().trim().split(" ");
+            for (int i = 0; i < Args.length; i++) {
+                Args[i] = Args[i].replace("\"", "");
+            }
 
-            switch (command) {
-                case "print balance" -> {
+            switch (Args[0]) {
+                case "print_balance" -> {
                     System.out.println("Your balance: " + user.balance);
                 }
-                case "show books in stock" -> {
+                case "show_books_in_stock" -> {
                     for (Book book : conn.GetAllBooks()) {
-                        System.out.println(book.toString());
+                        System.out.println("\"" + book.title + "\", " + book.quantity + " pieces, " + book.price + " rub.");
                     }
                 }
                 case "buy" -> {
+                    if (Args.length != 3) {
+                        System.out.println("no deal");
+                        break;
+                    }
 
-                }
-                case "show bought books" -> {
-                    for (Book book : conn.GetUser(user.id).boughtBooks) {
-                        System.out.println(book.toString());
+                    Book RequestedBook = conn.GetBook(Args[1]);
+
+                    if (RequestedBook == null ||
+                            RequestedBook.quantity < Integer.parseInt(Args[2]) ||
+                            user.balance < RequestedBook.price * Integer.parseInt(Args[2])) {
+                        System.out.println("no deal");
+                    }
+                    else {
+                        user.balance -= RequestedBook.price * Integer.parseInt(Args[2]);
+                        RequestedBook.quantity -= Integer.parseInt(Args[2]);
+                        user.boughtBooks.add(RequestedBook);
+
+                        conn.UpdateUser(user);
+                        conn.UpdateBook(RequestedBook);
+
+                        System.out.println("deal");
                     }
                 }
-                case "add books" -> {
+                case "show_bought_books" -> {
+                    for (Book book : conn.GetUser(user.id).boughtBooks) {
+                        System.out.println("\"" + book.title + "\", " + book.quantity + " pieces.");
+                    }
+                }
+                case "add_books" -> {
                     String book;
-                    do {
+                    System.out.println("Enter books \"<name>\", <quantity>, <price>: ");
+
+                    while (true){
                         book = sc.nextLine();
+
+                        if (book.equals("0")) {
+                            break;
+                        }
+
                         String[] bookInfo = book.split(", ");
 
                         bookInfo[0] = bookInfo[0].replace("\"", "");
-
-                        conn.AddBook(new Book(bookInfo[0], Integer.parseInt(bookInfo[1]), Integer.parseInt(bookInfo[2])))    ;
-
-                    } while (!Objects.equals(book, "0"));
+                        try {
+                            conn.AddBook(new Book(bookInfo[0], Integer.parseInt(bookInfo[1]), Integer.parseInt(bookInfo[2])));
+                        } catch (NumberFormatException e) {
+                            System.out.println("Invalid book info.");
+                        }
+                    }
+                }
+                case "top_up" -> {
+                    try {
+                        user.balance += Integer.parseInt(Args[1]);
+                        conn.UpdateUser(user);
+                    } catch (Exception e) {
+                        System.out.println("Invalid amount.");
+                    }
+                }
+                case "help" -> {
+                    Help();
                 }
                 case "exit" -> {
+                    conn.Close();
                     System.exit(0);
                 }
-                default -> System.out.println("Invalid command!");
+                default -> System.out.println("Invalid command.");
             }
         }
+    }
+
+    private static void Help() {
+        System.out.println("""
+                Commands:
+                print_balance - print your balance
+                show_books_in_stock - show books in stock
+                buy "<name>" <quantity> - buy book
+                show_bought_books - show bought books
+                top_up <amount> - top up your balance
+                add_books - add books to stock
+                help - show commands list
+                exit - exit
+                """);
     }
 }
